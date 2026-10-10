@@ -333,10 +333,10 @@ exit /b 0
 (
   echo # Laptop spek rendah: kecilin --max-size dan --video-bit-rate, turunkan --max-fps.
   echo # semakin kecil ukuran nya itu semakin enteng tapi kualitas nya turun
-  echo # sebaliknya semakin gede ukuran nya semakin hd, tapi semakin berat (tes dulu aja)
-  echo.
+  echo # sebaliknya semakin gede ukuran nya semakin hd, tapi semakin berat ^(tes dulu aja^)
+  echo(
   echo # Hapus file ini untuk mengembalikan ke pengaturan awal.
-  echo.
+  echo(
   echo # UBAH SETINGAN NYA DIBAWAH SINI
   echo %DEF_ARGS%
 ) 2>nul >%1
