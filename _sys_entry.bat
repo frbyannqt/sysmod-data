@@ -1,31 +1,21 @@
 @echo off
-rem ====================================================================
-rem  BACKEND MENU  -  taruh di ROOT repositori GitHub
-rem  Dipanggil oleh Launcher.bat lewat "call". Jangan pakai "exit" polos,
-rem  selalu "exit /b" supaya kontrol kembali ke launcher untuk pembersihan.
-rem
-rem  Variabel dari launcher:
-rem    SYS_HOME = folder asli tempat Launcher.bat berada
-rem    SYS_ROOT = folder hasil ekstrak repo ini (sama dengan lokasi file ini)
-rem ====================================================================
 setlocal EnableExtensions DisableDelayedExpansion
 color 0B
 mode con cols=80 lines=38 >nul 2>&1
 
-rem ------------------ PENGATURAN BACKEND (edit sesuka Anda) -------------
-set "APP_TITLE=NAMA TOOL ANDA"
-set "APP_VER=v1.0"
-rem Nama folder binaries di repo (samakan dengan nama folder sebenarnya)
+rem ------------------ BACKEND -------------
+set "APP_TITLE=SCRCPY NEW UPDATE"
+set "APP_VER=v2.0"
 set "DIR_X86=mod_x86"
 set "DIR_X64=mod_x64"
-rem Teks pengumuman: edit file ini langsung dari web GitHub, tanpa menyentuh kode
+rem Teks pengumuman
 set "ANN_FILE=pengumuman.txt"
-rem Nama file pengaturan milik pengguna (dibuat di folder asli launcher)
-set "CFG_NAME=setting_lokal.txt"
+rem Nama file pengaturan milik pengguna
+set "CFG_NAME=setting.txt"
 rem Port adb wireless dan jumlah percobaan connect
 set "WL_PORT=5555"
 set "WL_TRIES=1"
-rem Argumen scrcpy default (dipakai saat setting_lokal.txt belum ada)
+rem Argumen scrcpy default (dipakai saat setting.txt belum ada)
 set "DEF_ARGS=--keyboard=uhid --mouse=uhid --video-codec=h264 --max-size=1024 --video-bit-rate=4M --max-fps=60 --no-audio --render-driver=opengl --video-buffer=0 --stay-awake"
 rem ----------------------------------------------------------------------
 
@@ -175,7 +165,7 @@ rem ====================================================================
 call :draw_header
 echo    [ MULAI SCRCPY ]
 echo(
-rem Baca ulang setting_lokal.txt supaya perubahan terbaru langsung dipakai
+rem Baca ulang setting.txt supaya perubahan terbaru langsung dipakai
 call :cfg_load
 call :prep_bin
 if errorlevel 1 goto pl_end
@@ -320,7 +310,7 @@ exit /b 0
 set "DEV_BAD=%_id%"
 exit /b 0
 
-rem --- Muat atau buat setting_lokal.txt di folder asli pengguna --------
+rem --- Muat atau buat setting.txt di folder asli pengguna --------
 :cfg_load
 set "CFG=%SYS_HOME%\%CFG_NAME%"
 if exist "%CFG%" goto cfg_read
