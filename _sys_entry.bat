@@ -331,9 +331,11 @@ exit /b 0
 
 :cfg_make
 (
-  echo # Pengaturan scrcpy. Baris berawalan # diabaikan.
-  echo # Laptop spek rendah: kecilkan --max-size dan --video-bit-rate, turunkan --max-fps.
+  echo # Laptop spek rendah: kecilin --max-size dan --video-bit-rate, turunkan --max-fps.
+  echo # semakin kecil ukuran nya itu semakin enteng tapi kualitas nya turun
+  echo.
   echo # Hapus file ini untuk mengembalikan ke pengaturan awal.
+  echo.
   echo %DEF_ARGS%
 ) 2>nul >%1
 exit /b 0
