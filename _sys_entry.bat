@@ -16,7 +16,7 @@ rem Port adb wireless dan jumlah percobaan connect
 set "WL_PORT=5555"
 set "WL_TRIES=1"
 rem Argumen scrcpy default (dipakai saat setting.txt belum ada)
-set "DEF_ARGS=--keyboard=uhid --mouse=uhid --video-codec=h264 --max-size=1000 --video-bit-rate=2M --max-fps=60 --video-buffer=30 --render-driver=direct3d --no-audio --no-clipboard-autosync --turn-screen-off"
+set "DEF_ARGS=--keyboard=uhid --mouse=uhid --video-codec=h264 --max-size=1000 --video-bit-rate=2M --max-fps=60 --video-buffer=30 --render-driver=direct3d --no-audio --turn-screen-off"
 rem ----------------------------------------------------------------------
 
 rem Folder runtime = folder file ini berada (tanpa backslash akhir)
