@@ -63,10 +63,11 @@ rem  MENU UTAMA
 rem ====================================================================
 :menu
 call :draw_header
+echo    Pilih Menu:
 echo    [1]  Koneksi Wireless
 echo    [2]  Mulai Scrcpy
 echo    [3]  Keluar
-echo    [4]  Diagnosa ^(kalau ada masalah^)
+echo    [4]  Diagnosa ^(cek error^)
 echo(
 choice /c 1234 /n /m "   Pilih menu [1-4] : "
 if errorlevel 4 (call :do_diag & goto menu)
@@ -282,14 +283,13 @@ echo    Arsitektur terdeteksi : %ARCH%-bit
 echo.
 echo(
 echo    [ PENGUMUMAN / UPDATE ]
-echo.
 if not exist "%RT%\%ANN_FILE%" goto hd_noann
 for /f "usebackq delims=" %%A in ("%RT%\%ANN_FILE%") do echo      %%A
 goto hd_end
 :hd_noann
 echo      Belum ada pengumuman.
 :hd_end
-echo    ------------------------------------------------------------------------
+echo.
 echo(
 exit /b 0
 
