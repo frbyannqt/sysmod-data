@@ -5,48 +5,58 @@ mode con cols=80 lines=38 >nul 2>&1
 
 rem ------------------ BACKEND -------------
 set "APP_TITLE=SCRCPY NEW UPDATE"
-set "APP_VER=v2.0"
-set "DIR_X86=mod_x86"
-set "DIR_X64=mod_x64"
-rem Teks pengumuman
+set "APP_VER=v2.2"
+rem Teks pengumuman (diunduh launcher dari repo)
 set "ANN_FILE=pengumuman.txt"
 rem Nama file pengaturan milik pengguna
 set "CFG_NAME=setting.txt"
 rem Port adb wireless dan jumlah percobaan connect
 set "WL_PORT=5555"
-set "WL_TRIES=1"
+set "WL_TRIES=3"
 rem Argumen scrcpy default (dipakai saat setting.txt belum ada)
 set "DEF_ARGS=--keyboard=uhid --mouse=uhid --video-codec=h264 --max-size=1000 --video-bit-rate=2M --max-fps=60 --video-buffer=30 --render-driver=direct3d --no-audio --turn-screen-off"
+rem Argumen PAKSA: selalu ditaruh paling belakang, tidak bisa ditimpa setting.txt.
+rem Mematikan shortcut Shift+klik (tengah=Home, kanan=Back) di mode uhid.
+rem Butuh scrcpy 3.x. Kalau scrcpy lebih lama, kosongkan nilainya.
+set "FORCE_ARGS=--mouse-bind=++++:++++"
+rem Sumber paket modul (GitHub Releases) - dipakai kalau binaries belum ada
+set "GITHUB_USER=frbyannqt"
+set "REPO_NAME=sysmod-data"
+set "PKG_X86=mod_x86.zip"
+set "PKG_X64=mod_x64.zip"
 rem ----------------------------------------------------------------------
 
 rem Folder runtime = folder file ini berada (tanpa backslash akhir)
 for %%I in ("%~dp0.") do set "RT=%%~fI"
 if not defined SYS_HOME set "SYS_HOME=%RT%"
-title %APP_TITLE% %APP_VER%
-
-rem Pakai port server adb sendiri supaya tidak bentrok dengan adb lain milik
-rem pengguna, dan kill-server di akhir tidak mematikan adb milik mereka.
-set "ANDROID_ADB_SERVER_PORT=5038"
-set "ADB=%RT%\adb.exe"
-set "BIN_READY=0"
-cd /d "%RT%"
-
-rem ---------------- 1. Deteksi arsitektur OS ---------------------------
-rem ARM64 dimasukkan ke 64-bit (Windows ARM mengemulasi x64).
+rem Arsitektur: pakai kiriman Launcher baru, kalau tidak ada deteksi sendiri
 set "ARCH=32"
 if /i "%PROCESSOR_ARCHITECTURE%"=="AMD64" set "ARCH=64"
 if /i "%PROCESSOR_ARCHITECTURE%"=="IA64"  set "ARCH=64"
 if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "ARCH=64"
-rem cmd 32-bit di atas Windows 64-bit
 if defined PROCESSOR_ARCHITEW6432 set "ARCH=64"
+title %APP_TITLE% %APP_VER%
 
-set "BIN_SRC=%RT%\%DIR_X86%"
-if "%ARCH%"=="64" set "BIN_SRC=%RT%\%DIR_X64%"
+rem Port server adb sendiri supaya tidak bentrok dengan adb milik pengguna,
+rem dan kill-server di akhir tidak mematikan adb milik mereka.
+set "ANDROID_ADB_SERVER_PORT=5038"
+cd /d "%RT%"
 
-rem ---------------- 2. Pengaturan lokal pengguna -----------------------
 call :cfg_load
 
+rem Siapkan adb + scrcpy (hasil: variabel BIN = folder yang berisi keduanya)
+call :prep_bin
+if errorlevel 1 goto boot_fail
+set "ADB=%BIN%\adb.exe"
+set "PATH=%BIN%;%PATH%"
 goto menu
+
+:boot_fail
+echo(
+echo    Tutup jendela ini lalu jalankan ulang Launcher.
+echo    Kalau tetap gagal, hubungi pembuat tool.
+pause >nul
+exit /b 1
 
 rem ====================================================================
 rem  MENU UTAMA
@@ -56,16 +66,18 @@ call :draw_header
 echo    [1]  Koneksi Wireless
 echo    [2]  Mulai Scrcpy
 echo    [3]  Keluar
+echo    [4]  Diagnosa ^(kalau ada masalah^)
 echo(
-choice /c 123 /n /m "   Pilih menu [1-3] : "
+choice /c 1234 /n /m "   Pilih menu [1-4] : "
+if errorlevel 4 (call :do_diag & goto menu)
 if errorlevel 3 goto menu_exit
 if errorlevel 2 (call :do_play & goto menu)
 if errorlevel 1 (call :do_wireless & goto menu)
 goto menu
 
 :menu_exit
-rem Matikan server adb milik kita (hanya jika binaries sempat disiapkan)
-if "%BIN_READY%"=="1" adb kill-server >nul 2>&1
+rem Matikan server adb milik kita
+adb kill-server >nul 2>&1
 exit /b 0
 
 rem ====================================================================
@@ -76,9 +88,7 @@ rem ====================================================================
 call :draw_header
 echo    [ KONEKSI WIRELESS ]
 echo(
-call :prep_bin
-if errorlevel 1 goto wl_end
-adb start-server >nul 2>&1
+call :adb_up
 if errorlevel 1 goto wl_adb
 
 call :scan_dev
@@ -86,9 +96,10 @@ if defined DEV_USB goto wl_usb
 if defined DEV_NET goto wl_already
 if defined DEV_BAD goto wl_unauth
 echo    [!] HP tidak terdeteksi.
-echo        1. Colok HP ke laptop dengan kabel USB data
+echo        1. Colok HP ke laptop dengan kabel USB data ^(bukan kabel charger^)
 echo        2. Aktifkan Opsi Pengembang ^> Debugging USB
 echo        3. Izinkan pop-up "Allow USB debugging" di layar HP
+call :show_adb
 goto wl_end
 
 :wl_usb
@@ -107,6 +118,7 @@ ping -n 4 127.0.0.1 >nul
 
 set "TRY=0"
 :wl_connect
+echo    Menghubungkan ke %PHONE_IP%:%WL_PORT% ...
 adb connect %PHONE_IP%:%WL_PORT% 2>&1 | findstr /i /c:"connected to" >nul
 if not errorlevel 1 goto wl_ok
 set /a TRY+=1
@@ -130,6 +142,7 @@ goto wl_end
 echo    [!] HP terdeteksi tetapi belum diizinkan atau status offline.
 echo        Lihat layar HP, izinkan debugging USB, centang "Selalu izinkan",
 echo        lalu coba lagi.
+call :show_adb
 goto wl_end
 
 :wl_noip
@@ -167,11 +180,10 @@ echo    [ MULAI SCRCPY ]
 echo(
 rem Baca ulang setting.txt supaya perubahan terbaru langsung dipakai
 call :cfg_load
-call :prep_bin
-if errorlevel 1 goto pl_end
-adb start-server >nul 2>&1
+call :adb_up
 if errorlevel 1 goto pl_adb
 
+echo    Mencari HP ...
 set "TRY=0"
 :pl_scan
 call :scan_dev
@@ -195,11 +207,13 @@ if defined DEV_BAD goto pl_unauth
 echo    [!] HP tidak terdeteksi.
 echo        - Pakai kabel : colok USB data dan aktifkan Debugging USB
 echo        - Pakai WiFi  : pilih menu [1] lebih dulu
+call :show_adb
 goto pl_end
 
 :pl_unauth
 echo    [!] HP terdeteksi tetapi belum diizinkan atau status offline.
 echo        Lihat layar HP dan izinkan debugging USB, lalu coba lagi.
+call :show_adb
 goto pl_end
 
 :pl_adb
@@ -207,7 +221,6 @@ echo    [!] Server adb gagal dijalankan. Tutup aplikasi lain yang memakai adb.
 goto pl_end
 
 :pl_run
-if not exist "%RT%\scrcpy.exe" goto pl_nobin
 echo    Target     : %TARGET%  [%MODE%]
 echo    Pengaturan : %CFG_NAME%
 echo(
@@ -215,20 +228,44 @@ echo    Scrcpy sedang berjalan. Tutup jendela scrcpy untuk kembali ke menu.
 echo    Tekan tombol ALT untuk melepas kursor mouse.
 echo(
 rem scrcpy.exe adalah aplikasi konsol, jadi skrip otomatis menunggu sampai
-rem jendelanya ditutup sebelum baris berikutnya dijalankan.
-scrcpy -s "%TARGET%" %USER_ARGS%
+rem jendelanya ditutup. FORCE_ARGS sengaja paling belakang.
+scrcpy -s "%TARGET%" %USER_ARGS% %FORCE_ARGS%
 set "RC=%errorlevel%"
 if "%RC%"=="0" exit /b 0
 echo(
 echo    [!] Scrcpy berhenti dengan kode %RC%.
 echo        Kemungkinan HP terputus atau argumen di %CFG_NAME% tidak valid.
-goto pl_end
-
-:pl_nobin
-echo    [!] scrcpy.exe tidak ditemukan pada modul. Hubungi pembuat tool.
+echo        Hapus file %CFG_NAME% untuk kembali ke pengaturan awal.
 goto pl_end
 
 :pl_end
+call :wait_key
+exit /b 0
+
+rem ====================================================================
+rem  MENU 4 : DIAGNOSA
+rem ====================================================================
+:do_diag
+call :draw_header
+echo    [ DIAGNOSA ]  ^(screenshot layar ini kalau mau tanya pembuat tool^)
+echo(
+echo    Arsitektur : %ARCH%-bit
+echo    Tanggal/jam: %date% %time:~0,5%   ^(harus benar, kalau tidak unduhan bisa gagal^)
+echo    Pengaturan : %CFG%
+echo    Argumen    : %USER_ARGS% %FORCE_ARGS%
+if defined SYS_LOG echo    Log        : %SYS_LOG%
+echo(
+echo    --- adb ---
+adb version 2>&1 | findstr /i "version"
+echo(
+echo    --- scrcpy ---
+scrcpy --version 2>&1 | findstr /b /i "scrcpy"
+echo(
+echo    --- perangkat ---
+call :adb_up
+call :show_adb
+goto dg_end
+:dg_end
 call :wait_key
 exit /b 0
 
@@ -263,23 +300,110 @@ echo    Tekan tombol apa saja untuk kembali ke menu...
 pause >nul
 exit /b 0
 
-rem --- Salin binaries sesuai arsitektur ke root runtime (sekali saja) --
+rem --- Siapkan modul: pakai yang sudah ada, kalau tidak unduh sesuai arsitektur
 :prep_bin
-if "%BIN_READY%"=="1" exit /b 0
-if not exist "%BIN_SRC%\adb.exe" goto pb_nosrc
-echo    Menyiapkan modul %ARCH%-bit ...
-xcopy "%BIN_SRC%\*" "%RT%\" /e /y /q /i >nul 2>&1
-if not exist "%RT%\adb.exe" goto pb_fail
-if not exist "%RT%\scrcpy.exe" goto pb_fail
-set "BIN_READY=1"
+rem 1) binaries sudah ada di folder ini (Launcher baru)
+set "BIN=%RT%"
+if exist "%BIN%\adb.exe" if exist "%BIN%\scrcpy.exe" exit /b 0
+rem 2) folder mod_x86 / mod_x64 masih ada di repo (susunan lama)
+set "BIN=%RT%\mod_x86"
+if "%ARCH%"=="64" set "BIN=%RT%\mod_x64"
+if exist "%BIN%\adb.exe" if exist "%BIN%\scrcpy.exe" exit /b 0
+rem 3) unduh paket yang sesuai arsitektur dari GitHub Releases
+set "PKG=%PKG_X86%"
+if "%ARCH%"=="64" set "PKG=%PKG_X64%"
+set "ZIPF=%RT%\mod_pkg.dat"
+set "BIN=%RT%\bin"
+echo(
+echo    Sistem terdeteksi : %ARCH%-bit
+echo    [1/2] Mengunduh modul %ARCH%-bit, mohon tunggu...
+call :dl "https://github.com/%GITHUB_USER%/%REPO_NAME%/releases/latest/download/%PKG%" "%ZIPF%"
+if not "%DL_RC%"=="0" goto pb_dlfail
+echo    [2/2] Menyiapkan modul...
+md "%BIN%" >nul 2>&1
+where tar.exe >nul 2>&1
+if errorlevel 1 goto pb_ps
+tar.exe -xf "%ZIPF%" -C "%BIN%" >nul 2>&1
+if not errorlevel 1 goto pb_find
+:pb_ps
+set "DL_OUT=%ZIPF%"
+set "DL_DIR=%BIN%"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try{Add-Type -AssemblyName System.IO.Compression.FileSystem;[IO.Compression.ZipFile]::ExtractToDirectory($env:DL_OUT,$env:DL_DIR)}catch{try{Expand-Archive -LiteralPath $env:DL_OUT -DestinationPath $env:DL_DIR -Force}catch{exit 1}}" >nul 2>&1
+if errorlevel 1 goto pb_bad
+:pb_find
+rem Isi ZIP bisa langsung di root atau di dalam 1 subfolder
+if exist "%BIN%\scrcpy.exe" goto pb_chk
+for /d %%D in ("%BIN%\*") do if exist "%%~fD\scrcpy.exe" set "BIN=%%~fD"
+:pb_chk
+if not exist "%BIN%\scrcpy.exe" goto pb_bad
+if not exist "%BIN%\adb.exe" goto pb_bad
+del "%ZIPF%" >nul 2>&1
 exit /b 0
-:pb_nosrc
-echo    [!] Folder modul untuk sistem %ARCH%-bit tidak ditemukan.
-echo        Hubungi pembuat tool.
+
+:pb_dlfail
+echo(
+if "%DL_RC%"=="6"  goto pb_net
+if "%DL_RC%"=="7"  goto pb_net
+if "%DL_RC%"=="28" goto pb_slow
+if "%DL_RC%"=="22" goto pb_404
+if "%DL_RC%"=="35" goto pb_ssl
+if "%DL_RC%"=="51" goto pb_ssl
+if "%DL_RC%"=="58" goto pb_ssl
+if "%DL_RC%"=="60" goto pb_ssl
+if "%DL_RC%"=="77" goto pb_ssl
+echo    [!] Gagal mengunduh modul ^(kode %DL_RC%^).
+echo        Periksa internet, matikan VPN/antivirus sementara, lalu coba lagi.
 exit /b 1
-:pb_fail
-echo    [!] Gagal menyiapkan modul. Pastikan antivirus tidak memblokir file.
+:pb_net
+echo    [!] Tidak ada koneksi internet atau GitHub tidak bisa dijangkau.
+echo        Pastikan WiFi/internet aktif, lalu jalankan ulang.
 exit /b 1
+:pb_slow
+echo    [!] Koneksi terlalu lambat sehingga unduhan terputus. Coba lagi.
+exit /b 1
+:pb_404
+echo    [!] File modul tidak ditemukan di server. Hubungi pembuat tool.
+exit /b 1
+:pb_ssl
+echo    [!] Koneksi aman gagal. Penyebab tersering: JAM LAPTOP SALAH.
+echo        Cek tanggal dan jam laptop ^(aktifkan Set time automatically^),
+echo        lalu jalankan ulang.
+exit /b 1
+:pb_bad
+echo    [!] Modul rusak atau tidak lengkap. Jalankan ulang.
+echo        Kalau tetap gagal, matikan antivirus sementara.
+exit /b 1
+
+rem --- Unduh: %1=URL  %2=file tujuan  -> hasil di DL_RC (0 = sukses) ----
+:dl
+set "DL_URL=%~1"
+set "DL_OUT=%~2"
+set "DL_RC=0"
+where curl.exe >nul 2>&1
+if errorlevel 1 goto dl_ps
+curl.exe -L -f -sS --connect-timeout 15 --max-time 240 --retry 2 -o "%DL_OUT%" "%DL_URL%" 2>nul
+set "DL_RC=%errorlevel%"
+goto dl_chk
+:dl_ps
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try{[Net.ServicePointManager]::SecurityProtocol=3072;(New-Object Net.WebClient).DownloadFile($env:DL_URL,$env:DL_OUT)}catch{exit 1}" >nul 2>&1
+set "DL_RC=%errorlevel%"
+:dl_chk
+if not "%DL_RC%"=="0" exit /b 0
+if not exist "%DL_OUT%" set "DL_RC=99"
+exit /b 0
+
+rem --- Nyalakan server adb (dengan pesan supaya tidak terlihat macet) --
+:adb_up
+echo    Menyalakan adb, mohon tunggu...
+adb start-server >nul 2>&1
+exit /b %errorlevel%
+
+rem --- Tampilkan daftar perangkat mentah dari adb ----------------------
+:show_adb
+echo(
+echo    Daftar perangkat menurut adb:
+adb devices -l 2>&1
+exit /b 0
 
 rem --- Pindai perangkat adb --------------------------------------------
 rem  Hasil: DEV_USB = ID kabel USB, DEV_NET = ID IP:port WiFi,
