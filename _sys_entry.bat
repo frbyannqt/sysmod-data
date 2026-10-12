@@ -247,7 +247,7 @@ rem  MENU 4 : DIAGNOSA
 rem ====================================================================
 :do_diag
 call :draw_header
-echo    [ DIAGNOSA ]  ^(screenshot layar ini kalau mau tanya pembuat tool^)
+echo    [ DIAGNOSA ]  ^(screenshot ini terus send ke wa gw di saluran kalo eror^)
 echo(
 echo    Arsitektur : %ARCH%-bit
 echo    Tanggal/jam: %date% %time:~0,5%   ^(harus benar, kalau tidak unduhan bisa gagal^)
@@ -276,13 +276,13 @@ rem ====================================================================
 rem --- Gambar header + area pengumuman ---------------------------------
 :draw_header
 cls
-echo ==============================================================================
+echo.
 echo    %APP_TITLE%  -  %APP_VER%
 echo    Arsitektur terdeteksi : %ARCH%-bit
-echo ==============================================================================
+echo.
 echo(
 echo    [ PENGUMUMAN / UPDATE ]
-echo    ------------------------------------------------------------------------
+echo.
 if not exist "%RT%\%ANN_FILE%" goto hd_noann
 for /f "usebackq delims=" %%A in ("%RT%\%ANN_FILE%") do echo      %%A
 goto hd_end
